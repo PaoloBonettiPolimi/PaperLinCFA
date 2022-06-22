@@ -225,7 +225,8 @@ class spca(BaseEstimator, TransformerMixin):
         return self._transform()
     
 
-### main run
+### main run ###
+
 if __name__ == "__main__":
 
 ################### Life Expectancy ###################
@@ -259,24 +260,31 @@ if __name__ == "__main__":
     mse_res = []
     i=0
     
-    while True:
-        try:
-            trial = spca(num_components=i+1, kernel='linear')
-            X_train_proj = trial.fit_and_transform(X_train,y_train)
-            X_test_proj = trial.transform(X_test)
+    for kernel in ['linear', 'poly', 'sigmoid']:
+        i=0
+        pca_res = []
+        mse_res = []
+        while (i<=50):
+            try:
             
-            if X_train_proj.shape[1]==0: continue
+                trial = spca(num_components=i+1, kernel=kernel, degree=3, gamma=None, coef0=1)
+                X_train_proj = trial.fit_and_transform(X_train,y_train)
+                X_test_proj = trial.transform(X_test)
+                
+                if X_train_proj.shape[1]==0: continue
             
-            regr = LinearRegression().fit(X_train_proj, y_train)
-            pca_res.append(regr.score(X_test_proj, y_test))
-            mse_res.append(mean_squared_error(y_test,regr.predict(X_test_proj)))
-            i += 1
-        except:
-            break
-            
-    print("Supervised PCA best number of components, R2 score, MSE:\n {0}".format(np.argmax(pca_res)))
-    print(pca_res[np.argmax(pca_res)])
-    print(mse_res[np.argmax(pca_res)])
+                regr = LinearRegression().fit(X_train_proj, y_train)
+                pca_res.append(regr.score(X_test_proj, y_test))
+                mse_res.append(mean_squared_error(y_test,regr.predict(X_test_proj)))
+
+                i += 1
+
+            except: break 
+        
+        print("Supervised PCA ({1} kernel) best number of components, R2 score, MSE:\n {0}".format(np.argmax(pca_res),kernel))
+        print(pca_res[np.argmax(pca_res)])
+        print(mse_res[np.argmax(pca_res)])
+
 
     print('LinBVA number of reduced dimensions: ')
     print(len(cluster))
@@ -335,7 +343,7 @@ if __name__ == "__main__":
 
             except: break 
         
-        print("Supervised PCA best number of components, R2 score, MSE:\n {0}".format(np.argmax(pca_res)))
+        print("Supervised PCA ({1} kernel) best number of components, R2 score, MSE:\n {0}".format(np.argmax(pca_res),kernel))
         print(pca_res[np.argmax(pca_res)])
         print(mse_res[np.argmax(pca_res)])
 
@@ -397,6 +405,6 @@ if __name__ == "__main__":
 
             except: break 
         
-        print("Supervised PCA best number of components, R2 score, MSE:\n {0}".format(np.argmax(pca_res)))
+        print("Supervised PCA ({1} kernel) best number of components, R2 score, MSE:\n {0}".format(np.argmax(pca_res),kernel))
         print(pca_res[np.argmax(pca_res)])
         print(mse_res[np.argmax(pca_res)])
