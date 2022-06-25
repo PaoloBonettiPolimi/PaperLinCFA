@@ -352,15 +352,10 @@ if __name__ == "__main__":
 
     print('\n### Climate ###')
 
-    # 1000 dati, 20 colonne
     df = pd.read_csv('../Paper_LinBVA/dataset/NDVI_anomalies.csv')
-    df = df.select_dtypes(['number'])
-    cols_to_delete = df.columns[df.isnull().sum()/len(df) > .50]
-    df.drop(cols_to_delete, axis = 1, inplace = True)
-    df = df.dropna()
-    y=df[df.columns[3]]
+    y=df.iloc[:,1]
     #df = df.iloc[:,4:]
-    X = df.iloc[:,4:104]
+    X = df.iloc[:,2:]
     #y=df[df.columns[1]]
 
     print(X.shape)
