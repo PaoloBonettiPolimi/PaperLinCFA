@@ -216,12 +216,12 @@ def compute_biasVariance(predictions_tot,predictions_aggr,y_test):
 ### main run
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--n_data", default=0, type=int)
-    parser.add_argument("--n_variables", default=0, type=int)
-    parser.add_argument("--noise", default=0.1, type=float)
-    parser.add_argument("--n_repetitions", default=1, type=int)
-    parser.add_argument("--p1", default=0.5, type=float)
-    parser.add_argument("--p2", default=0.5, type=float)
+    parser.add_argument("--n_data", default=500, type=int)
+    parser.add_argument("--n_variables", default=100, type=int)
+    parser.add_argument("--noise", default=10, type=float)
+    parser.add_argument("--n_repetitions", default=500, type=int)
+    parser.add_argument("--p1", default=0.3, type=float)
+    parser.add_argument("--p2", default=0.7, type=float)
 
     args = parser.parse_args()
     print(args)
