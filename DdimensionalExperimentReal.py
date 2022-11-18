@@ -19,6 +19,8 @@ from sklearn.preprocessing import KernelCenterer, scale
 from sklearn.metrics.pairwise import pairwise_kernels
 from scipy import linalg
 from scipy.sparse.linalg import eigsh as ssl_eigsh
+from sklearn.decomposition import PCA
+from sklearn.metrics import r2_score
 
 ### compute correlation between two random variables
 def compute_corr(x1,x2):
@@ -223,24 +225,28 @@ class spca(BaseEstimator, TransformerMixin):
     def fit_and_transform(self, X, Y):
         self.fit(X, Y)
         return self._transform()
-    
 
-### main run ###
+### R2 computation
+def compute_r2(x_train, y_train, x_val, y_val):
+    regr = LinearRegression().fit(x_train,y_train)
+    y_pred = regr.predict(x_val)
+    mse = mean_squared_error(y_val,y_pred)
+    return r2_score(y_val, y_pred), mse
 
-if __name__ == "__main__":
+### unsupervised PCA 
+def compute_PCA(max_components, train_df, val_df, train_target, val_target):
 
-################### Life Expectancy ###################
-    print('\n### Life Expectancy ###')
+    pca = PCA(n_components=max_components)
+    actual_train = pca.fit_transform(train_df)
+    actual_val = pca.transform(val_df)
+    actual_r2, mse = compute_r2(actual_train, train_target, actual_val, val_target)
 
-    df = pd.read_csv('../Paper_LinBVA/dataset/Life Expectancy Data.csv')
-    df = df.dropna()
+    print(f'95% Components: {actual_train.shape[1]}, R2: {actual_r2}, MSE: {mse}\n')
 
-    X = df.iloc[:,4:]
-    Y = df.iloc[:,3]
 
-    print("Dataset shape: {}".format(X.shape))
-
-    X_train, X_test, y_train, y_test = train_test_split(X, Y, test_size=0.33, random_state=42)
+### preprocessing
+def preprocess(X,Y, shuffle=True):
+    X_train, X_test, y_train, y_test = train_test_split(X, Y, test_size=0.33, random_state=42, shuffle=shuffle)
     X_train = np.array(X_train)
     X_test = np.array(X_test)
     y_train = np.array(y_train)
@@ -254,46 +260,71 @@ if __name__ == "__main__":
     y_train = scaler.transform(y_train.reshape(-1,1))
     y_test = scaler.transform(y_test.reshape(-1,1))
 
+    return X_train, X_test, y_train, y_test
+
+### train supervised PCA
+def train_sup_PCA(X_train,y_train,X_test,y_test):
+    for kernel in ['linear', 'poly', 'sigmoid']:
+            i=0
+            pca_res = []
+            mse_res = []
+            while (i<=50):
+                try:
+                
+                    trial = spca(num_components=i+1, kernel=kernel, degree=3, gamma=None, coef0=1)
+                    X_train_proj = trial.fit_and_transform(X_train,y_train)
+                    X_test_proj = trial.transform(X_test)
+                    
+                    if X_train_proj.shape[1]==0: continue
+                
+                    regr = LinearRegression().fit(X_train_proj, y_train)
+                    pca_res.append(regr.score(X_test_proj, y_test))
+                    mse_res.append(mean_squared_error(y_test,regr.predict(X_test_proj)))
+
+                    i += 1
+
+                except: break 
+            
+            print("Supervised PCA ({1} kernel) best number of components, R2 score, MSE:\n {0}".format(np.argmax(pca_res),kernel))
+            print(pca_res[np.argmax(pca_res)])
+            print(mse_res[np.argmax(pca_res)])
+
+
+### main run ###
+
+if __name__ == "__main__":
+
+################### Life Expectancy ###################
+    print('\n### Life Expectancy ###')
+
+    df = pd.read_csv('../PaperLinCFA/dataset/Life Expectancy Data.csv')
+    df = df.dropna()
+
+    X = df.iloc[:,4:]
+    Y = df.iloc[:,3]
+
+    print("Dataset shape: {}".format(X.shape))
+
+    X_train, X_test, y_train, y_test = preprocess(X,Y)
+
     cluster,score_full,score_aggr,mse_full,mse_aggr = single_experiment_realData_nDim(X_train, X_test, y_train, y_test)
 
     pca_res = []
     mse_res = []
     i=0
-    
-    for kernel in ['linear', 'poly', 'sigmoid']:
-        i=0
-        pca_res = []
-        mse_res = []
-        while (i<=50):
-            try:
-            
-                trial = spca(num_components=i+1, kernel=kernel, degree=3, gamma=None, coef0=1)
-                X_train_proj = trial.fit_and_transform(X_train,y_train)
-                X_test_proj = trial.transform(X_test)
-                
-                if X_train_proj.shape[1]==0: continue
-            
-                regr = LinearRegression().fit(X_train_proj, y_train)
-                pca_res.append(regr.score(X_test_proj, y_test))
-                mse_res.append(mean_squared_error(y_test,regr.predict(X_test_proj)))
 
-                i += 1
+    train_sup_PCA(X_train,y_train,X_test,y_test) 
 
-            except: break 
-        
-        print("Supervised PCA ({1} kernel) best number of components, R2 score, MSE:\n {0}".format(np.argmax(pca_res),kernel))
-        print(pca_res[np.argmax(pca_res)])
-        print(mse_res[np.argmax(pca_res)])
-
-
-    print('LinBVA number of reduced dimensions: ')
+    print('LinCFA number of reduced dimensions: ')
     print(len(cluster))
+
+    compute_PCA(0.95, X_train, X_test, y_train, y_test)
 
     ################### Finance ###################
 
     print('\n### Finance ###')
 
-    df = pd.read_csv('../Paper_LinBVA/dataset/fundamentals.csv')
+    df = pd.read_csv('../PaperLinCFA/dataset/fundamentals.csv')
     df = df.select_dtypes(['number'])
     cols_to_delete = df.columns[df.isnull().sum()/len(df) > .50]
     df.drop(cols_to_delete, axis = 1, inplace = True)
@@ -303,56 +334,22 @@ if __name__ == "__main__":
 
     print("Dataset shape: {}".format(X.shape))
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33, random_state=42)
-
-    X_train = np.array(X_train)
-    X_test = np.array(X_test)
-    y_train = np.array(y_train)
-    y_test = np.array(y_test)
-
-    scaler = preprocessing.StandardScaler().fit(np.array(X_train))
-    X_train = scaler.transform(X_train)
-    X_test = scaler.transform(X_test)
-
-    scaler = preprocessing.StandardScaler().fit(y_train.reshape(-1,1))
-    y_train = scaler.transform(y_train.reshape(-1,1))
-    y_test = scaler.transform(y_test.reshape(-1,1))
+    X_train, X_test, y_train, y_test = preprocess(X,y)
 
     cluster,score_full,score_aggr,mse_full,mse_aggr = single_experiment_realData_nDim(X_train, X_test, y_train, y_test)
-    print('LinBVA number of reduced dimensions: ')
+    print('LinCFA number of reduced dimensions: ')
     print(len(cluster))
 
-    for kernel in ['linear', 'poly', 'sigmoid']:
-        i=0
-        pca_res = []
-        mse_res = []
-        while (i<=50):
-            try:
-            
-                trial = spca(num_components=i+1, kernel=kernel, degree=3, gamma=None, coef0=1)
-                X_train_proj = trial.fit_and_transform(X_train,y_train)
-                X_test_proj = trial.transform(X_test)
-                
-                if X_train_proj.shape[1]==0: continue
-            
-                regr = LinearRegression().fit(X_train_proj, y_train)
-                pca_res.append(regr.score(X_test_proj, y_test))
-                mse_res.append(mean_squared_error(y_test,regr.predict(X_test_proj)))
+    train_sup_PCA(X_train,y_train,X_test,y_test) 
 
-                i += 1
-
-            except: break 
-        
-        print("Supervised PCA ({1} kernel) best number of components, R2 score, MSE:\n {0}".format(np.argmax(pca_res),kernel))
-        print(pca_res[np.argmax(pca_res)])
-        print(mse_res[np.argmax(pca_res)])
+    compute_PCA(0.95, X_train, X_test, y_train, y_test)
 
 
     ################### Climate ###################
 
     print('\n### Climate ###')
 
-    df = pd.read_csv('../Paper_LinBVA/dataset/NDVI_anomalies.csv')
+    df = pd.read_csv('../PaperLinCFA/dataset/NDVI_anomalies.csv')
     y=df.iloc[:,1]
     #df = df.iloc[:,4:]
     X = df.iloc[:,2:]
@@ -360,46 +357,12 @@ if __name__ == "__main__":
 
     print(X.shape)
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33, random_state=42, shuffle=False)
-
-    X_train = np.array(X_train)
-    X_test = np.array(X_test)
-    y_train = np.array(y_train)
-    y_test = np.array(y_test)
-
-    scaler = preprocessing.StandardScaler().fit(np.array(X_train))
-    X_train = scaler.transform(X_train)
-    X_test = scaler.transform(X_test)
-
-    scaler = preprocessing.StandardScaler().fit(y_train.reshape(-1,1))
-    y_train = scaler.transform(y_train.reshape(-1,1))
-    y_test = scaler.transform(y_test.reshape(-1,1))
+    X_train, X_test, y_train, y_test = preprocess(X,y,shuffle=False)
 
     cluster,score_full,score_aggr,mse_full,mse_aggr = single_experiment_realData_nDim(X_train, X_test, y_train, y_test)
-    print('LinBVA number of reduced dimensions: ')
+    print('LinCFA number of reduced dimensions: ')
     print(len(cluster))
 
-    for kernel in ['linear', 'poly', 'sigmoid']:
-        i=0
-        pca_res = []
-        mse_res = []
-        while (i<=50):
-            try:
-            
-                trial = spca(num_components=i+1, kernel=kernel, degree=3, gamma=None, coef0=1)
-                X_train_proj = trial.fit_and_transform(X_train,y_train)
-                X_test_proj = trial.transform(X_test)
-                
-                if X_train_proj.shape[1]==0: continue
-            
-                regr = LinearRegression().fit(X_train_proj, y_train)
-                pca_res.append(regr.score(X_test_proj, y_test))
-                mse_res.append(mean_squared_error(y_test,regr.predict(X_test_proj)))
+    train_sup_PCA(X_train,y_train,X_test,y_test) 
 
-                i += 1
-
-            except: break 
-        
-        print("Supervised PCA ({1} kernel) best number of components, R2 score, MSE:\n {0}".format(np.argmax(pca_res),kernel))
-        print(pca_res[np.argmax(pca_res)])
-        print(mse_res[np.argmax(pca_res)])
+    compute_PCA(0.95, X_train, X_test, y_train, y_test)
