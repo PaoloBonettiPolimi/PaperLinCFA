@@ -242,6 +242,7 @@ def compute_PCA(max_components, train_df, val_df, train_target, val_target):
     actual_r2, mse = compute_r2(actual_train, train_target, actual_val, val_target)
 
     print(f'95% Components: {actual_train.shape[1]}, R2: {actual_r2}, MSE: {mse}\n')
+    return actual_r2
 
 
 ### preprocessing
@@ -264,6 +265,7 @@ def preprocess(X,Y, shuffle=True):
 
 ### train supervised PCA
 def train_sup_PCA(X_train,y_train,X_test,y_test):
+    r2_tot = {'linear':[],'poly':[],'sigmoid':[]}
     for kernel in ['linear', 'poly', 'sigmoid']:
             i=0
             pca_res = []
@@ -288,6 +290,8 @@ def train_sup_PCA(X_train,y_train,X_test,y_test):
             print("Supervised PCA ({1} kernel) best number of components, R2 score, MSE:\n {0}".format(np.argmax(pca_res),kernel))
             print(pca_res[np.argmax(pca_res)])
             print(mse_res[np.argmax(pca_res)])
+            r2_tot[kernel] = pca_res
+    return r2_tot
 
 
 ### main run ###
@@ -358,6 +362,25 @@ if __name__ == "__main__":
     print(X.shape)
 
     X_train, X_test, y_train, y_test = preprocess(X,y,shuffle=False)
+
+    cluster,score_full,score_aggr,mse_full,mse_aggr = single_experiment_realData_nDim(X_train, X_test, y_train, y_test)
+    print('LinCFA number of reduced dimensions: ')
+    print(len(cluster))
+
+    train_sup_PCA(X_train,y_train,X_test,y_test) 
+
+    compute_PCA(0.95, X_train, X_test, y_train, y_test)
+
+    ################### TC ###################
+
+    print('\n### Climate extended ###')
+
+    df = pd.read_csv('../PaperLinCFA/dataset/droughts_extended.csv')
+
+    X_train = np.array(df.iloc[:-392,:-1])
+    y_train = np.array(df.iloc[:-392,-1]).reshape(-1,1)
+    X_test = np.array(df.iloc[-392:,:-1])
+    y_test = np.array(df.iloc[-392:,-1]).reshape(-1,1)
 
     cluster,score_full,score_aggr,mse_full,mse_aggr = single_experiment_realData_nDim(X_train, X_test, y_train, y_test)
     print('LinCFA number of reduced dimensions: ')
