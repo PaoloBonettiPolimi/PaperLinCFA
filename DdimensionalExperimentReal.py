@@ -21,6 +21,7 @@ from scipy import linalg
 from scipy.sparse.linalg import eigsh as ssl_eigsh
 from sklearn.decomposition import PCA
 from sklearn.metrics import r2_score
+from lpproj import LocalityPreservingProjection as lpp
 
 ### compute correlation between two random variables
 def compute_corr(x1,x2):
@@ -244,6 +245,23 @@ def compute_PCA(max_components, train_df, val_df, train_target, val_target):
     print(f'95% Components: {actual_train.shape[1]}, R2: {actual_r2}, MSE: {mse}\n')
     return actual_r2
 
+### LPP 
+def compute_LPP(train_df, val_df, train_target, val_target, max_dim=50):
+    best_r2 = 0
+    best_mse = 0
+    best_dimension = 0
+    for i in range(max_dim):
+        dimRedMethod = lpp(n_components=i+1)
+        actual_train = dimRedMethod.fit_transform(train_df)
+        actual_val = dimRedMethod.transform(val_df)
+        actual_r2, actual_mse = compute_r2(actual_train, train_target, actual_val, val_target)
+        if actual_r2>best_r2:
+            best_r2 = actual_r2
+            best_mse = actual_mse
+            best_dimension = i+1 
+    print(f'LPP --> Components: {best_dimension}, R2: {best_r2}, MSE: {best_mse}\n')
+    return best_dimension,best_r2,best_mse
+
 
 ### preprocessing
 def preprocess(X,Y, shuffle=True):
@@ -324,6 +342,8 @@ if __name__ == "__main__":
 
     compute_PCA(0.95, X_train, X_test, y_train, y_test)
 
+    compute_LPP(X_train, X_test, y_train, y_test,17)
+
     ################### Finance ###################
 
     print('\n### Finance ###')
@@ -348,8 +368,9 @@ if __name__ == "__main__":
 
     compute_PCA(0.95, X_train, X_test, y_train, y_test)
 
+    compute_LPP(X_train, X_test, y_train, y_test)
 
-    ################### Climate ###################
+    ################### Climate 1 ###################
 
     print('\n### Climate ###')
 
@@ -371,7 +392,9 @@ if __name__ == "__main__":
 
     compute_PCA(0.95, X_train, X_test, y_train, y_test)
 
-    ################### TC ###################
+    compute_LPP(X_train, X_test, y_train, y_test)
+
+    ################### Climate 2 ###################
 
     print('\n### Climate extended ###')
 
@@ -389,3 +412,5 @@ if __name__ == "__main__":
     train_sup_PCA(X_train,y_train,X_test,y_test) 
 
     compute_PCA(0.95, X_train, X_test, y_train, y_test)
+
+    compute_LPP(X_train, X_test, y_train, y_test)
