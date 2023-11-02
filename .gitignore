@@ -127,3 +127,5 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+dataset/cifar_10_10000_regression.csv
+dataset/geneData.csv

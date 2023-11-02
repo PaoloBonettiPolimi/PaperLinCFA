@@ -31,7 +31,9 @@ from sklearn.neural_network import MLPRegressor
 from sklearn.utils.validation import column_or_1d
 import warnings
 from sklearn.exceptions import ConvergenceWarning
+import sklearn_relief as sr
 warnings.simplefilter("ignore", category=ConvergenceWarning)
+from sklearn.utils import resample
 
 ### compute correlation between two random variables
 def compute_corr(x1,x2):
@@ -81,7 +83,7 @@ def single_experiment_realData_nDim(X_train, X_test, y_train, y_test):
 
     n_variables = X_train.shape[1]
     n_data = X_train.shape[0]
-    
+    print(n_variables)
     score_full = []
     score_aggr = []
     mse_full = []
@@ -96,7 +98,6 @@ def single_experiment_realData_nDim(X_train, X_test, y_train, y_test):
     emp_predictions_tot = np.zeros((int(n_data),1))
     emp_predictions_aggr = np.zeros((int(n_data),1))
     emp_n_clust = []
-        
     features_df = pd.DataFrame(X_train)
     target_df = pd.DataFrame(y_train)
     x = np.array(X_train)
@@ -111,6 +112,7 @@ def single_experiment_realData_nDim(X_train, X_test, y_train, y_test):
         curr_list = [j]
         used_indices.append(j)
         for i in range(n_variables-j-1):
+            if i+j+1 in used_indices: continue
             corr = compute_corr(x[:,j],x[:,i+j+1])
             
             real_bound = compute_empirical_bound(x[:,j],x[:,i+j+1],y) 
@@ -119,8 +121,10 @@ def single_experiment_realData_nDim(X_train, X_test, y_train, y_test):
                 curr_list.append(i+j+1)
                 used_indices.append(i+j+1)
         cluster.append(curr_list)
+        print(len(used_indices))
     
     emp_n_clust = len(cluster)
+    print(cluster)
     
     x_aggr=aggregate_clusters(cluster,x)
     x_test_aggr = aggregate_clusters(cluster,X_test)
@@ -129,39 +133,45 @@ def single_experiment_realData_nDim(X_train, X_test, y_train, y_test):
     regr_full = LinearRegression().fit(features_df, target_df)
     regr_aggr = LinearRegression().fit(aggregate_df, target_df)
     
-    print("full regression score: {0}".format(regr_full.score(X_test, y_test)))
+    #print("full regression score: {0}".format(regr_full.score(X_test, y_test)))
     full_RRMSE = relative_root_mean_squared_error(y_test, regr_full.predict(X_test))
-    print(f'RRMSE: {full_RRMSE}')
-    compute_r2_nonLin(features_df, target_df, X_test, y_test)
+    #print(f'RRMSE: {full_RRMSE}')
+    r2_svr_full,mse_svr_full,RRMSE_svr_full,r2_xgboost_full,mse_xgboost_full,RRMSE_xgboost_full,r2_mlp_full,mse_mlp_full,RRMSE_mlp_full = compute_r2_nonLin(features_df, target_df, X_test, y_test)
 
-    print("aggr regression score: {0}".format(regr_aggr.score(x_test_aggr, y_test)))
+    #print("aggr regression score: {0}".format(regr_aggr.score(x_test_aggr, y_test)))
     aggr_RRMSE = relative_root_mean_squared_error(y_test, regr_aggr.predict(x_test_aggr))
-    print(f'RRMSE: {aggr_RRMSE}')
+    #print(f'RRMSE: {aggr_RRMSE}')
     score_full.append(regr_full.score(X_test, y_test))
     score_aggr.append(regr_aggr.score(x_test_aggr, y_test))
-    compute_r2_nonLin(aggregate_df, target_df, x_test_aggr, y_test)
+    r2_svr_aggr,mse_svr_aggr,RRMSE_svr_aggr,r2_xgboost_aggr,mse_xgboost_aggr,RRMSE_xgboost_aggr,r2_mlp_aggr,mse_mlp_aggr,RRMSE_mlp_aggr = compute_r2_nonLin(aggregate_df, target_df, x_test_aggr, y_test)
     
-    print("full regression MSE: {0}".format(mean_squared_error(y_test,regr_full.predict(X_test))))
-    print("aggr regression MSE: {0}".format(mean_squared_error(y_test,regr_aggr.predict(x_test_aggr))))
+    #print("full regression MSE: {0}".format(mean_squared_error(y_test,regr_full.predict(X_test))))
+    #print("aggr regression MSE: {0}".format(mean_squared_error(y_test,regr_aggr.predict(x_test_aggr))))
     
     mse_full=mean_squared_error(y_test,regr_full.predict(X_test))
     mse_aggr=mean_squared_error(y_test,regr_aggr.predict(x_test_aggr))
 
-    print ('Ridge Regression:')
+    #print ('Ridge Regression:')
     regr = Ridge().fit(features_df, target_df)
-    print("R2: {0}".format(regr.score(X_test, y_test)))
-    print(f'MSE: {mean_squared_error(y_test,regr.predict(X_test))}')
-    print(f'RRMSE: {relative_root_mean_squared_error(y_test, regr.predict(X_test))}')
-    print(regr.predict(X_test))
+    score_ridge = regr.score(X_test, y_test)
+    #print("R2: {0}".format(score_ridge))
+    MSE_ridge = mean_squared_error(y_test,regr.predict(X_test))
+    #print(f'MSE: {MSE_ridge}')
+    RRMSE_ridge = relative_root_mean_squared_error(y_test, regr.predict(X_test))
+    #print(f'RRMSE: {RRMSE_ridge}')
+    #print(regr.predict(X_test))
 
-    print ('Lasso Regression:')
+    #print ('Lasso Regression:')
     regr = Lasso(0.1).fit(features_df, target_df)
-    print("R2: {0}".format(regr.score(X_test, y_test)))
-    print(f'MSE: {mean_squared_error(y_test,regr.predict(X_test))}')
-    print(f'RRMSE: {relative_root_mean_squared_error(y_test, regr.predict(X_test).reshape(-1,1))}')
-    print(regr.predict(X_test))
+    score_lasso = regr.score(X_test, y_test)
+    #print("R2: {0}".format(score_lasso))
+    MSE_lasso = mean_squared_error(y_test,regr.predict(X_test))
+    #print(f'MSE: {mean_squared_error(y_test,regr.predict(X_test))}')
+    RRMSE_lasso = relative_root_mean_squared_error(y_test, regr.predict(X_test))
+    #print(f'RRMSE: {relative_root_mean_squared_error(y_test, regr.predict(X_test).reshape(-1,1))}')
+    #print(regr.predict(X_test))
 
-    return cluster,score_full,score_aggr,mse_full,mse_aggr
+    return cluster,score_full,score_aggr,mse_full,mse_aggr,aggr_RRMSE,full_RRMSE,score_ridge,MSE_ridge,RRMSE_ridge,score_lasso,MSE_lasso,RRMSE_lasso,r2_svr_full,mse_svr_full,RRMSE_svr_full,r2_xgboost_full,mse_xgboost_full,RRMSE_xgboost_full,r2_mlp_full,mse_mlp_full,RRMSE_mlp_full,r2_svr_aggr,mse_svr_aggr,RRMSE_svr_aggr,r2_xgboost_aggr,mse_xgboost_aggr,RRMSE_xgboost_aggr,r2_mlp_aggr,mse_mlp_aggr,RRMSE_mlp_aggr
 
 
 ### supervised PCA
@@ -277,22 +287,26 @@ def compute_r2_nonLin(x_train, y_train, x_val, y_val):
     y_val = np.asarray(y_val).reshape(-1,)
     regr = SVR().fit(x_train,y_train)
     y_pred = regr.predict(x_val)
-    mse = mean_squared_error(y_val,y_pred)
-    print(f'SVM for regression: {r2_score(y_val, y_pred)}, {mse}\n')
-    RRMSE = relative_root_mean_squared_error(y_val, y_pred)
-    print(f'RRMSE: {RRMSE}')
+    mse_svr = mean_squared_error(y_val,y_pred)
+    r2_svr = r2_score(y_val, y_pred)
+    #print(f'SVM for regression: {r2_score(y_val, y_pred)}, {mse}\n')
+    RRMSE_svr = relative_root_mean_squared_error(y_val, y_pred)
+    #print(f'RRMSE: {RRMSE}')
     regr = XGBRegressor().fit(x_train,y_train)
     y_pred = regr.predict(x_val)
-    mse = mean_squared_error(y_val,y_pred)
-    print(f'XGBoost for regression: {r2_score(y_val, y_pred)}, {mse}\n')
-    RRMSE = relative_root_mean_squared_error(y_val, y_pred)
-    print(f'RRMSE: {RRMSE}')
+    r2_xgboost = r2_score(y_val, y_pred)
+    mse_xgboost = mean_squared_error(y_val,y_pred)
+    #print(f'XGBoost for regression: {r2_score(y_val, y_pred)}, {mse}\n')
+    RRMSE_xgboost = relative_root_mean_squared_error(y_val, y_pred)
+    #print(f'RRMSE: {RRMSE}')
     regr = MLPRegressor().fit(x_train,y_train)
     y_pred = regr.predict(x_val)
-    mse = mean_squared_error(y_val,y_pred)
-    print(f'MLP for regression: {r2_score(y_val, y_pred)}, {mse}\n')
-    RRMSE = relative_root_mean_squared_error(y_val, y_pred)
-    print(f'RRMSE: {RRMSE}')
+    mse_mlp = mean_squared_error(y_val,y_pred)
+    r2_mlp = r2_score(y_val, y_pred)
+    #print(f'MLP for regression: {r2_score(y_val, y_pred)}, {mse}\n')
+    RRMSE_mlp = relative_root_mean_squared_error(y_val, y_pred)
+    #print(f'RRMSE: {RRMSE}')
+    return r2_svr,mse_svr,RRMSE_svr,r2_xgboost,mse_xgboost,RRMSE_xgboost,r2_mlp,mse_mlp,RRMSE_mlp
 
 ### unsupervised PCA 
 def compute_PCA(max_components, train_df, val_df, train_target, val_target):
@@ -427,6 +441,7 @@ def compute_kernelPCA(train_df, val_df, train_target, val_target, max_dim=50):
 def compute_isomap(train_df, val_df, train_target, val_target, max_dim=50):
     best_r2 = 0
     best_mse = 0
+    best_RRMSE = 0
     best_dimension = 1
     for i in range(max_dim):
         dimRedMethod = Isomap(n_components=i+1,n_neighbors=25)
@@ -437,15 +452,17 @@ def compute_isomap(train_df, val_df, train_target, val_target, max_dim=50):
         if actual_r2>best_r2:
             best_r2 = actual_r2
             best_mse = actual_mse
-            best_dimension = i+1 
+            best_dimension = i+1
     print(f'Isomap --> Components: {best_dimension}, R2: {best_r2}, MSE: {best_mse}\n')
-    dimRedMethod = Isomap(n_components=best_dimension,n_neighbors=10)
+    dimRedMethod = Isomap(n_components=best_dimension,n_neighbors=25)
     actual_train = dimRedMethod.fit_transform(train_df)
     actual_val = dimRedMethod.transform(val_df)
     regr = LinearRegression().fit(actual_train, train_target)
-    print(relative_root_mean_squared_error(val_target, regr.predict(actual_val)))
-    compute_r2_nonLin(actual_train, train_target, actual_val, val_target)
-    return best_dimension,best_r2,best_mse
+    best_RRMSE = relative_root_mean_squared_error(val_target, regr.predict(actual_val))
+
+    r2_svr,mse_svr,RRMSE_svr,r2_xgboost,mse_xgboost,RRMSE_xgboost,r2_mlp,mse_mlp,RRMSE_mlp = compute_r2_nonLin(actual_train, train_target, actual_val, val_target)
+    
+    return best_dimension,best_r2,best_mse,best_RRMSE,r2_svr,mse_svr,RRMSE_svr,r2_xgboost,mse_xgboost,RRMSE_xgboost,r2_mlp,mse_mlp,RRMSE_mlp
 
 ### LLE
 def compute_LLE(train_df, val_df, train_target, val_target, max_dim=50):
@@ -470,4 +487,35 @@ def compute_LLE(train_df, val_df, train_target, val_target, max_dim=50):
     print(relative_root_mean_squared_error(val_target, regr.predict(actual_val)))
     compute_r2_nonLin(actual_train, train_target, actual_val, val_target)
     return best_dimension,best_r2,best_mse
+
+### RRelieff
+def compute_RRelieFF(train_df, val_df, train_target, val_target, max_dim=50):
+    best_r2 = 0
+    best_mse = 0
+    best_RRMSE = 0
+    best_dimension = 1
+    #print(train_df.shape,train_target.shape)
+    train_target = train_target.reshape(-1,)
+    val_target = val_target.reshape(-1,)
+    for i in range(max_dim):
+        dimRedMethod = sr.RReliefF(n_features = i+1) 
+        actual_train = dimRedMethod.fit_transform(train_df,train_target)
+        actual_val = dimRedMethod.transform(val_df)
+        actual_r2, actual_mse = compute_r2(actual_train, train_target, actual_val, val_target)
+        #print(actual_r2, actual_mse) 
+        if actual_r2>best_r2:
+            best_r2 = actual_r2
+            best_mse = actual_mse
+            best_dimension = i+1 
+    print(f'RRelieFF --> Components: {best_dimension}, R2: {best_r2}, MSE: {best_mse}\n')
+    dimRedMethod = sr.RReliefF(n_features = best_dimension) 
+    actual_train = dimRedMethod.fit_transform(train_df,train_target)
+    actual_val = dimRedMethod.transform(val_df)
+    regr = LinearRegression().fit(actual_train, train_target)
+    best_RRMSE = relative_root_mean_squared_error(val_target, regr.predict(actual_val))
+
+    #print(relative_root_mean_squared_error(val_target, regr.predict(actual_val)))
+    r2_svr,mse_svr,RRMSE_svr,r2_xgboost,mse_xgboost,RRMSE_xgboost,r2_mlp,mse_mlp,RRMSE_mlp = compute_r2_nonLin(actual_train, train_target, actual_val, val_target)
+    return best_dimension,best_r2,best_mse,best_RRMSE,r2_svr,mse_svr,RRMSE_svr,r2_xgboost,mse_xgboost,RRMSE_xgboost,r2_mlp,mse_mlp,RRMSE_mlp
+
 
